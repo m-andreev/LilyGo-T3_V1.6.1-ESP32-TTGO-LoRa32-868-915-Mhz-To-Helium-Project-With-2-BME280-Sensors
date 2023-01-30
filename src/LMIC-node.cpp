@@ -61,6 +61,9 @@
 
 #include "cactus_io_BME280_I2C.h"
 #include <Wire.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 //#include "cactus_io_BME280_I2C.cpp"
 
 // Create two BME280 instances
@@ -810,30 +813,29 @@ void processWork(ostime_t doWorkJobTimeStamp)
         else
         {
             
-            // Prepare uplink payload.
-            // uint8_t fPort = 10;
-            // payloadBuffer[0] = counterValue >> 8;
-            // payloadBuffer[1] = counterValue & 0xFF;
-            // uint8_t payloadLength = 2;
+            //// Prepare uplink payload.
+        
             
             uint8_t fPort = 10;
             uint8_t payloadLength = 16; //// TOVA TRQBVA DA SE OPRAVI!!!!!!!!!!!!!!
             uint8_t payloadSize = 0;
 
             ///Here we must prepare the uplink payload
-            //uint8_t s1temp[payloadLength];
-            //uint8_t s2temp[payloadLength];
+         
             char temp1[5];
             char temp2[5];
             char fullbuffer1[payloadLength*2];
-            //char fullbuffer2[payloadLength];
-            //char fullBuffer[payloadLength*2];
+            
 
             //s1temp values
             //we need to convert from float to uint8_t/char the values
             float temperature1 = bme1.getTemperature_C();
+            snprintf(temp1, sizeof(temp1), "%.2f", temperature1);
             //4 is mininum width, 2 is precision; float value is copied onto buff value1
-            dtostrf(temperature1, 4, 2, temp1); ///double to string conversion function
+            ///dtostrf(temperature1, 4, 2, temp1); ///double to string conversion function
+            //sprintf(temp1, "%g", temperature1);
+            
+            
 
             strcat(fullbuffer1 , "t1: ");
             strcat(fullbuffer1, temp1);
@@ -842,59 +844,40 @@ void processWork(ostime_t doWorkJobTimeStamp)
             //s2temp values
             //we need to convert from float to uint8_t/char the values
             float temperature2 = bme2.getTemperature_C();
+            snprintf(temp2, sizeof(temp2), "%.2f", temperature2);
             //4 is mininum width, 2 is precision; float value is copied onto buff value1
-            dtostrf(temperature2, 4, 2, temp2); ///double to string conversion function
-
+            ///dtostrf(temperature2, 4, 2, temp2); ///double to string conversion function
+            //sprintf(temp2, "%g", temperature2);
+            
             strcat(fullbuffer1 , "t2: ");
             strcat(fullbuffer1, temp2);
             strcat(fullbuffer1, " *C");
-
-            //strcat(fullBuffer , fullbuffer1);
-           // strcat(fullBuffer , " ");
-            //strcat(fullBuffer , fullbuffer2);
             
             Serial.println();
+            uint8_t Ccounter = 0;
             for(int i = 0; i <sizeof(fullbuffer1); i++) {
+                char c = (char)fullbuffer1[i];
+                 
+                 if(Ccounter == 2){
+                        fullbuffer1[i] = '\0';
+                        payloadBuffer[i] = '\0';
+                        payloadSize = i;
+                        break;
+                      }
+               // if(!(c>='0' && c<='9' || c>='a'&& c<='z' || c>='A' && c<='Z'|| c == ' ' || c == '.' || c == ':'|| c == '*'))
+                     // {
+                      //   fullbuffer1[i] = '\0';
+                      // }
+                      if(c == 'C'){
+                              Ccounter++;  
+                      }
+                payloadBuffer[i] = c;
                 Serial.print((char)fullbuffer1[i]);
             }
             Serial.println();
            
-             for(int i = 0; i<sizeof(fullbuffer1); i++) {
-                
-                payloadBuffer[i] = fullbuffer1[i];
-            }
-            
-            /// Here we clear the unnecessary symbols
-            for(int i=0;i<sizeof(fullbuffer1);i++) {
-                char c = (char)payloadBuffer[i];
-                if(!(c>='0' && c<='9' || c>='a'&& c<='z' || c>='A' && c<='Z'|| c == ' '))
-                      {
-                         fullbuffer1[i] = ' ';
-                         payloadBuffer[i] = ' ';
-                         payloadSize= i;
-                         break;
-                       }
-            }
-
-            scheduleUplink(fPort, payloadBuffer, payloadSize-1);
-            
-
-             /*
-            uint8_t i=0;
-          while(true) {
-            char c = (char)fullBuffer[i];
-            if(!(c>='0' && c<='9' || c>='a'&& c<='z' || c>='A' && c<='Z'|| c == ' '))
-                      {
-                         fullBuffer[i] = ' ';
-                         payloadBuffer[i] = ' ';
-                       }
-          payloadBuffer[i] = fullBuffer[i];
-          Serial.print((char)payloadBuffer[i]);
-          i++;
-          }
-          */
-          
-
+        
+            scheduleUplink(fPort, payloadBuffer, payloadSize);
         }
     }
  }
