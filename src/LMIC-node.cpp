@@ -64,13 +64,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 //#include "cactus_io_BME280_I2C.cpp"
 
 // Create two BME280 instances
 BME280_I2C bme1(0x77); // I2C using address 0x77
 BME280_I2C bme2(0x76); // I2C using address 0x76
 
-const uint8_t payloadBufferLength = 32;    // Adjust to fit max payload length
+const uint8_t payloadBufferLength = 4;    // Adjust to fit max payload length
 
 uint8_t tempVar[payloadBufferLength];
 int8_t downlinkLength;
@@ -725,6 +726,25 @@ void resetCounter()
     counter_ = 0;
 }
 
+static short Encode(double value) {
+  int cnt = 0;
+  while (value != floor(value)) {
+    value *= 10.0;
+    cnt++;
+  }
+  return (short)((cnt << 12) + (int)value);
+}
+
+static double Decode(short value) {
+  int cnt = value >> 12;
+  double result = value & 0xfff;
+  while (cnt > 0) {
+    result /= 10.0;
+    cnt--;
+  }
+  return result;
+}
+
 
 void processWork(ostime_t doWorkJobTimeStamp)
 {
@@ -788,6 +808,7 @@ void processWork(ostime_t doWorkJobTimeStamp)
             Serial.print(bme2.getPressure_MB()); Serial.print(" mb\t"); // Pressure in millibars
             Serial.print(bme2.getHumidity()); Serial.print(" %\t\t");
             Serial.print(bme2.getTemperature_C()); Serial.print(" *C\t");
+            Serial.println();
             
 
             // Add a 1 second delay.
@@ -822,62 +843,72 @@ void processWork(ostime_t doWorkJobTimeStamp)
 
             ///Here we must prepare the uplink payload
          
-            char temp1[5];
-            char temp2[5];
-            char fullbuffer1[payloadLength*2];
+            //char temp1[5];
+            //char temp2[5];
+            char fullbuffer1[4];          
             
+            ///Encoding
 
-            //s1temp values
-            //we need to convert from float to uint8_t/char the values
             float temperature1 = bme1.getTemperature_C();
-            snprintf(temp1, sizeof(temp1), "%.2f", temperature1);
-            //4 is mininum width, 2 is precision; float value is copied onto buff value1
-            ///dtostrf(temperature1, 4, 2, temp1); ///double to string conversion function
-            //sprintf(temp1, "%g", temperature1);
-            
-            
+            uint16_t a = temperature1 * 10 + 0.5;
 
-            strcat(fullbuffer1 , "t1: ");
-            strcat(fullbuffer1, temp1);
-            strcat(fullbuffer1, " *C ");
-
-            //s2temp values
-            //we need to convert from float to uint8_t/char the values
             float temperature2 = bme2.getTemperature_C();
-            snprintf(temp2, sizeof(temp2), "%.2f", temperature2);
-            //4 is mininum width, 2 is precision; float value is copied onto buff value1
-            ///dtostrf(temperature2, 4, 2, temp2); ///double to string conversion function
-            //sprintf(temp2, "%g", temperature2);
+            uint16_t b = temperature2 * 10 + 0.5;
+
+            uint32_t result = (a << 16) | b; //now the upper 16 bits (i.e. 2 bytes) are the value of `a` and the lower 16 bits are the value of `b`
+            memcpy(payloadBuffer, &result, sizeof(result)); /// We send the encoded payload
+
+            Serial.println(a/10.0);
+            Serial.println(b/10,0);
+            Serial.println(result);
             
-            strcat(fullbuffer1 , "t2: ");
-            strcat(fullbuffer1, temp2);
-            strcat(fullbuffer1, " *C");
+            /*
+            ///Receiving - Decoding
+
+            uint32_t received_value = result;
+            uint16_t a_received = received_value >> 16; 
+            uint16_t b_received = received_value & 0xffff; 
+            //received_value = (a >> 16) | b;
+
+            a_received = a_received/10.0;
+            b_received = b_received/10.0;
             
-            Serial.println();
-            uint8_t Ccounter = 0;
-            for(int i = 0; i <sizeof(fullbuffer1); i++) {
-                char c = (char)fullbuffer1[i];
-                 
-                 if(Ccounter == 2){
-                        fullbuffer1[i] = '\0';
-                        payloadBuffer[i] = '\0';
-                        payloadSize = i;
-                        break;
-                      }
-               // if(!(c>='0' && c<='9' || c>='a'&& c<='z' || c>='A' && c<='Z'|| c == ' ' || c == '.' || c == ':'|| c == '*'))
-                     // {
-                      //   fullbuffer1[i] = '\0';
-                      // }
-                      if(c == 'C'){
-                              Ccounter++;  
-                      }
-                payloadBuffer[i] = c;
-                Serial.print((char)fullbuffer1[i]);
+            Serial.println(a_received);
+            Serial.println(b_received);
+            //Serial.println(received_value);
+
+            //uint8_t* p1 = &payloadBuffer[2];
+            memcpy(payloadBuffer, &a_received, sizeof(a_received));
+            memcpy(payloadBuffer+2, &b_received, sizeof(b_received));
+
+            //for (uint8_t i = 0;i<sizeof(received_value);i++){
+            //     payloadBuffer[i] = result2[i];
+           // }
+
+
+            float temp1f = a / 10.0;
+            float temp2f = b / 10.0;
+
+            Serial.println(temp1f);
+            Serial.println(temp2f);
+
+            for(int i=0;i<sizeof(payloadBuffer);i++){
+                Serial.print((char)payloadBuffer[i]);
             }
+             Serial.println();
+             */
+
+           
+
+            ///This is encoding two 16 bit values into a single 32 bit value
+            // and then recovering the original 16 bit values from that afterwards
+            ///and then you can obtain your original floats from those 16 bit values by dividing by 10
+
+            
             Serial.println();
            
         
-            scheduleUplink(fPort, payloadBuffer, payloadSize);
+            scheduleUplink(fPort, payloadBuffer, 4);
         }
     }
  }
