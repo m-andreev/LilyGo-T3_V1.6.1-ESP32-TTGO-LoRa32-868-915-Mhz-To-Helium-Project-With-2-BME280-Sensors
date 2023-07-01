@@ -1,4 +1,4 @@
-In this project are soldered 2 BME280 sensors to a LilyGo-T3_V1.6.1 ESP32 TTGO LoRa32 868-815 MHz and all the configuration is connected to the Helium Network. The project is made with LMIC-Node and Cactus_IO library for the BME280 sensors. In this project the idea is to prepare a payload message, which contains the current read temperatures from the 2 sensors, as an uplink to the Helium network.
+In this project are soldered 2 BME280 sensors to a LilyGo-T3_V1.6.1 ESP32 TTGO LoRa32 868-815 MHz and all the configuration is connected to the Helium Network. The project is made with LMIC-Node and Cactus_IO library for the BME280 sensors. In this project the idea is to prepare a payload message, which contains the current read temperatures from the 2 sensors, as an uplink to the Helium network as a DEFAULT uplink (if no downlinks are sent). If downlink with text message is sent, the uplink should be assigned to the message from the new downlink.
 
 This repository contains LMIC-node, an example LoRaWAN application for a node for The Things Network.  
 Get your node quickly up and running with LMIC-node.
